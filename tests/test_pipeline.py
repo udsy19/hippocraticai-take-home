@@ -52,20 +52,21 @@ class PipelineTest(unittest.TestCase):
         self.assertIn("story 1", llm.prompts[1])
 
     def test_best_draft_wins_when_a_revision_gets_worse(self):
-        llm = FakeLLM([verdict(4), verdict(3), verdict(3)])
+        llm = FakeLLM([verdict(5, age_fit=3), verdict(3), verdict(3)])
         session = Storyteller(llm, max_revisions=2).tell("Alice and Bob")
         self.assertEqual(session.story, "story 1")
         self.assertEqual(len(session.drafts), 3)
 
     def test_unsafe_drafts_are_never_shown(self):
-        llm = FakeLLM([verdict(5, safety=4), verdict(5, safety=3)])
+        llm = FakeLLM([verdict(5, safety=3), verdict(5, safety=2)])
         session = Storyteller(llm, max_revisions=1).tell("something spooky")
         self.assertIsNone(session.best)
         self.assertEqual(session.story, SORRY)
 
     def test_high_average_cannot_outvote_the_safety_gate(self):
-        self.assertFalse(verdict(5, safety=4).passes(4.3))
-        self.assertFalse(verdict(5, age_fit=3).passes(4.3))
+        self.assertFalse(verdict(5, safety=4).passes)
+        self.assertFalse(verdict(5, safety=3).is_safe)
+        self.assertTrue(verdict(5, safety=4).is_safe)
 
     def test_listener_feedback_reaches_the_writer_and_is_rejudged(self):
         llm = FakeLLM([verdict(5), verdict(5)])

@@ -10,7 +10,6 @@ from . import prompts
 from .llm import LLM, ModelDeclined
 from .schemas import StoryBrief, Verdict
 
-PASS_BAR = 4.3  # mean rubric score a draft needs to stop the loop early
 MAX_REQUEST_CHARS = 2000
 
 SORRY = (
@@ -97,7 +96,7 @@ class Storyteller:
             session.drafts.append(draft)
             candidates.append(draft)
             self.on_event(_summary(round_number, draft.verdict))
-            if draft.verdict.passes(PASS_BAR) or round_number == self.max_revisions:
+            if draft.verdict.passes or round_number == self.max_revisions:
                 break
             self.on_event("Revising with the editor's notes...")
             story = self.llm.text(
@@ -110,7 +109,11 @@ class Storyteller:
         # A revision can score lower than its predecessor, so choose the best
         # safe draft instead of assuming the last one is the best.
         safe = [draft for draft in candidates if draft.verdict.is_safe]
-        return max(safe, key=lambda draft: draft.verdict.average, default=None)
+        return max(
+            safe,
+            key=lambda draft: (draft.verdict.safety.score, draft.verdict.average),
+            default=None,
+        )
 
     def _judge(self, session: Session, story: str) -> Verdict:
         return self.llm.structured(
@@ -125,7 +128,7 @@ class Storyteller:
 
 def _summary(round_number: int, verdict: Verdict) -> str:
     scores = " ".join(f"{name}={score}" for name, score in verdict.scores().items())
-    status = "pass" if verdict.passes(PASS_BAR) else "revise"
+    status = "pass" if verdict.passes else "revise"
     return f"Editor review {round_number + 1}: {verdict.average:.1f}/5 [{status}] {scores}"
 
 

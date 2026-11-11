@@ -88,8 +88,10 @@ class Verdict(_Strict):
 
     @property
     def is_safe(self) -> bool:
-        """Hard gate: a story that is not clearly safe is never shown."""
-        return self.safety.score >= 5 and self.age_fit.score >= 4
+        """Hard gate for showing a story at all. 4 means a small, harmless nit."""
+        return self.safety.score >= 4 and self.age_fit.score >= 3
 
-    def passes(self, bar: float) -> bool:
-        return self.is_safe and min(self.scores().values()) >= 3 and self.average >= bar
+    @property
+    def passes(self) -> bool:
+        """Good enough to stop revising: spotless on safety, no weak criterion."""
+        return self.safety.score == 5 and min(self.scores().values()) >= 4

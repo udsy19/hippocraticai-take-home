@@ -1,2 +1,4 @@
 anthropic>=2.8,<3
 pydantic>=2
+# Optional, only for --backend agent-sdk:
+# claude-agent-sdk>=0.2

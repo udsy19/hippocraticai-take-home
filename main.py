@@ -31,9 +31,19 @@ def parse_args() -> argparse.Namespace:
                         metavar="2-10", help="read-aloud length (default 5)")
     parser.add_argument("--revisions", type=int, default=2,
                         help="max judge-driven rewrites per story (default 2)")
+    parser.add_argument("--backend", choices=["api", "agent-sdk"], default="api",
+                        help="Messages API with ANTHROPIC_API_KEY (default), or the "
+                        "Claude Agent SDK using your Claude Code login")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="show the plan, the judge's scores and its notes")
     return parser.parse_args()
+
+
+def make_llm(backend: str):
+    if backend == "api":
+        return ClaudeLLM()
+    from bedtime.agent_sdk_llm import AgentSDKLLM  # optional dependency
+    return AgentSDKLLM()
 
 
 def show(session: Session, verbose: bool) -> None:
@@ -53,15 +63,15 @@ def show(session: Session, verbose: bool) -> None:
 
 def main() -> int:
     args = parse_args()
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        print("Set ANTHROPIC_API_KEY in your environment first.", file=sys.stderr)
+    if args.backend == "api" and not os.getenv("ANTHROPIC_API_KEY"):
+        print("Set ANTHROPIC_API_KEY, or use --backend agent-sdk.", file=sys.stderr)
         return 1
     progress = (lambda message: print(f"  [{message}]", file=sys.stderr))
     request = args.request or input("What kind of story do you want to hear? ")
     print("\nOne moment while I think of a good one...")
     try:
         teller = Storyteller(
-            ClaudeLLM(), max_revisions=args.revisions,
+            make_llm(args.backend), max_revisions=args.revisions,
             on_event=progress if args.verbose else (lambda message: None),
         )
         session = teller.tell(request, minutes=args.minutes)

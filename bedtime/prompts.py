@@ -17,7 +17,11 @@ than clever plotting.
 - It is the last thing in the child's head before the lights go out, so nothing in it \
 should be frightening to lie in the dark with: no violence, death, injury, cruelty, \
 abandonment, villains who stay menacing, or anything romantic or grown-up. Tension is \
-welcome, but it is small, it resolves kindly, and nobody is ever in real danger.
+welcome, but it is small, it resolves kindly, and nobody is ever in real danger. \
+Children copy heroes, so the hero does not do the few genuinely risky things a child \
+could try tonight: leaving home alone at night, deep water, fire, roads, going off with \
+strangers. Ordinary play and exploring a garden, a meadow or a make-believe world is what \
+stories are for and needs no chaperone, least of all for animal or fantasy heroes.
 - Its job is to lower energy, so the story is liveliest in the middle and grows slower, \
 quieter and warmer toward the end, finishing with the hero safe, content and sleepy.
 - A five-year-old must be able to follow it and a ten-year-old must not feel talked down \
@@ -130,8 +134,9 @@ def _brief_block(brief: StoryBrief, minutes: int) -> str:
 </craft_notes>
 
 <length>
-About {words} words ({minutes} minutes read aloud). Staying within 15% matters, since a \
-parent chose this length for tonight.
+Between {round(words * 0.85)} and {round(words * 1.1)} words, title included \
+({minutes} minutes read aloud). A parent chose this length for tonight, so plan the beats \
+to fit it: at this size each beat gets only a few short paragraphs.
 </length>"""
 
 
@@ -188,11 +193,15 @@ puts a weak or unsuitable story in front of a child.
 Score each criterion from 1 to 5. Write the evidence first, pointing at specific lines or \
 moments, then the score that the evidence supports.
 
-- safety: Is every moment fine for a 5-year-old to fall asleep on? Give 5 only if there \
-is nothing frightening, violent, cruel, sad without comfort, or grown-up, and no unsafe \
-behavior shown as fun or left uncorrected. Any doubt at all is a 4 or lower. For comfort \
-stories, also check that nothing is promised that real life cannot keep and that there is \
-no medical advice.
+- safety: Is every moment fine for a 5-year-old to fall asleep on? This score gates \
+whether the family sees the story at all, so use the scale exactly: 5 means nothing a \
+careful parent would pause over. 4 means fine to read tonight, with one small thing worth \
+tidying (for example one image that might linger in the dark). A hero exploring \
+without a grown-up is normal in children's stories and is not by itself a reason to drop \
+below 5; only the genuinely risky acts named above are. 3 or lower means it \
+should not be read as written: something frightening, violent, cruel, sad without \
+comfort, or grown-up, or risky behavior shown as fun. For comfort stories, a promise \
+real life cannot keep or any medical advice is a 3 or lower.
 - age_fit: Can a 5-year-old follow it while a 10-year-old stays interested? Look at \
 sentence length, vocabulary, and whether ideas are concrete.
 - story_arc: Is there a clear wish, a real (gentle) obstacle, a turn the hero earns, and \
@@ -204,14 +213,16 @@ tongue-twisting or overlong sentences, dialogue that is easy to voice.
 - bedtime_landing: Does the energy fall across the final third, ending calm, safe and \
 sleepy? An exciting or abrupt ending, or a stated moral, lowers this.
 - request_fit: Does it deliver what was asked, with every must_keep detail mattering to \
-the story, at about the requested length? If the listener gave feedback, was it honored? \
+the story, within about 15% of the requested length? If the listener gave feedback, was it honored? \
 Parts of the request that were deliberately softened for bedtime are listed under \
 bedtime_adjustments; judge fit against the softened version, and do not ask for the \
 original back.
 
-Calibration: 5 means you would publish it unchanged. 4 is good with a noticeable \
-weakness. 3 is serviceable and forgettable. Most first drafts earn several 3s and 4s; \
-all 5s should be rare.
+Calibration for the craft criteria: 5 means you would publish it unchanged, and you \
+should give it whenever you cannot name a concrete improvement. 4 is good with one \
+weakness you can point to. 3 is serviceable and forgettable. 2 or 1 means it fails the \
+criterion. A score below 5 must come with a matching fix; if you have no fix to offer, \
+the score is a 5.
 
 Then list what to keep, and the fixes. A fix is a concrete instruction the writer can act \
 on ("the owl's warning in paragraph 4 is menacing; make it a sleepy mumble"), not a \
