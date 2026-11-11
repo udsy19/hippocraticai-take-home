@@ -1,25 +1,27 @@
 """
 Before submitting the assignment, describe here in a few sentences what you would have built next if you spent 2 more hours on this project:
 
-1. An offline eval harness: a fixed set of ~30 requests (plain, vague, unsuitable,
-   prompt-injection, real-worry "comfort" cases) run through the pipeline, with the
-   judge's scores logged per prompt version, so prompt changes are measured instead
-   of eyeballed. I would also hand-label a few stories to check that the judge's
-   scores agree with a human's before trusting it as the gate.
-2. A second, narrower safety judge that runs in parallel with the craft judge and
-   votes independently, since one model grading its own family's writing is the
-   weakest link in the system.
-3. Light personalization across nights: remember the child's favorite characters
-   and refrain so tomorrow's story can continue tonight's.
+1. Calibrate the reviewers against people. The judge and the safety reviewer are the
+   same model that wrote the story, so I would hand-label around 50 stories (including
+   deliberately flawed ones) and measure how often each reviewer agrees with a human
+   before trusting their scores further. evals/run.py already gives the harness; it
+   needs labelled data and a larger fixture set so the win rates carry error bars.
+2. Track tokens and cost per stage next to the call counts and latency already
+   recorded, then test cheaper settings (lower judge effort, skipping the second
+   review when the first draft passes cleanly) against the eval instead of guessing.
+3. An --age flag that narrows 5-10 into three bands with their own vocabulary and
+   length targets, checked against the same eval.
 """
 import argparse
 import os
 import sys
 
-import anthropic
-
 from bedtime.llm import ClaudeLLM
-from bedtime.pipeline import ModelDeclined, SORRY, Session, Storyteller
+from bedtime.metrics import MeteredLLM
+from bedtime.pipeline import (
+    MAX_REVISIONS, SORRY, InvalidRequest, ModelDeclined, ModelUnavailable,
+    Session, Storyteller,
+)
 
 example_requests = "A story about a girl named Alice and her best friend Bob, who happens to be a cat."
 
@@ -30,7 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--minutes", type=int, default=5, choices=range(2, 11),
                         metavar="2-10", help="read-aloud length (default 5)")
     parser.add_argument("--revisions", type=int, default=2,
-                        help="max judge-driven rewrites per story (default 2)")
+                        choices=range(0, MAX_REVISIONS + 1), metavar=f"0-{MAX_REVISIONS}",
+                        help="max review-driven rewrites per story (default 2)")
     parser.add_argument("--backend", choices=["api", "agent-sdk"], default="api",
                         help="Messages API with ANTHROPIC_API_KEY (default), or the "
                         "Claude Agent SDK using your Claude Code login")
@@ -46,19 +49,21 @@ def make_llm(backend: str):
     return AgentSDKLLM()
 
 
-def show(session: Session, verbose: bool) -> None:
-    if session.brief.adjustments and session.best and not session.feedback:
+def show(session: Session, verbose: bool, first: bool = False) -> None:
+    if first and session.brief.adjustments and session.best:
         print("\nA note for the grown-up: I made this gentler for bedtime.")
         for change in session.brief.adjustments:
             print(f"  - {change}")
     print(f"\n{session.story}\n")
     if verbose and session.best:
-        verdict = session.best.verdict
+        draft = session.best
         print("--- editor's review of this version ---")
-        for name in verdict.CRITERIA:
-            criterion = getattr(verdict, name)
+        for name in draft.verdict.CRITERIA:
+            criterion = getattr(draft.verdict, name)
             print(f"{name:>16} {criterion.score}/5  {criterion.evidence}")
-        print(f"drafts written: {len(session.drafts)}\n")
+        print(f"{'safety check':>16} {'clear' if draft.safety.cleared else 'concerns'}")
+        print(f"{'length':>16} {draft.words} words")
+        print(f"drafts reviewed: {len(session.drafts)}\n")
 
 
 def main() -> int:
@@ -66,36 +71,40 @@ def main() -> int:
     if args.backend == "api" and not os.getenv("ANTHROPIC_API_KEY"):
         print("Set ANTHROPIC_API_KEY, or use --backend agent-sdk.", file=sys.stderr)
         return 1
+    llm = MeteredLLM(make_llm(args.backend))
     progress = (lambda message: print(f"  [{message}]", file=sys.stderr))
+    teller = Storyteller(
+        llm, max_revisions=args.revisions,
+        on_event=progress if args.verbose else (lambda message: None),
+    )
     request = args.request or input("What kind of story do you want to hear? ")
     print("\nOne moment while I think of a good one...")
     try:
-        teller = Storyteller(
-            make_llm(args.backend), max_revisions=args.revisions,
-            on_event=progress if args.verbose else (lambda message: None),
-        )
         session = teller.tell(request, minutes=args.minutes)
-        show(session, args.verbose)
+        show(session, args.verbose, first=True)
         while session.best and sys.stdin.isatty():
             feedback = input("Want anything changed? (press Enter to say goodnight) ")
             if not feedback.strip():
                 break
-            before = session.best
-            session = teller.revise(session, feedback)
-            if session.best is before:
+            try:
+                changed = teller.revise(session, feedback)
+            except InvalidRequest as err:
+                print(f"\n{err}")
+                continue
+            if not changed:
                 print("\nI couldn't find a cozy way to do that, so I kept our story as it was.")
             show(session, args.verbose)
+    except InvalidRequest as err:
+        print(f"\n{err}")
+        return 2
     except ModelDeclined:
         print(f"\n{SORRY}")
-    except anthropic.AuthenticationError:
-        print("The Anthropic API rejected ANTHROPIC_API_KEY.", file=sys.stderr)
+    except ModelUnavailable as err:
+        print(f"\n{err}", file=sys.stderr)
         return 1
-    except anthropic.APIConnectionError:
-        print("Couldn't reach the Anthropic API. Check your connection.", file=sys.stderr)
-        return 1
-    except anthropic.APIStatusError as err:
-        print(f"The Anthropic API returned an error ({err.status_code}).", file=sys.stderr)
-        return 1
+    finally:
+        if args.verbose:
+            print(f"  [{llm.metrics.summary()}]", file=sys.stderr)
     print("Goodnight. Sweet dreams.")
     return 0
 

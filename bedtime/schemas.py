@@ -6,15 +6,26 @@ validates it again on our side.
 """
 from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Category = Literal[
     "adventure", "friendship", "funny", "cozy", "mystery", "curiosity", "comfort"
 ]
 
 
+Score = Literal[1, 2, 3, 4, 5]
+SafetyResult = Literal["pass", "fail", "uncertain"]
+MAX_FIXES = 5
+
+
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+def _non_blank(value: str) -> str:
+    if not value.strip():
+        raise ValueError("must not be blank")
+    return value
 
 
 class StoryBrief(_Strict):
@@ -48,12 +59,24 @@ class StoryBrief(_Strict):
         description="A short, rhythmic line that can come back two or three times."
     )
 
+    _required_text = field_validator("title", "hero", "setting", "wish")(_non_blank)
+
+    @field_validator("beats")
+    @classmethod
+    def _enough_beats(cls, beats: list[str]) -> list[str]:
+        # The API guarantees the shape of the JSON, not that it is usable: a
+        # brief without a real arc is rejected here and the planner is retried.
+        beats = [beat for beat in beats if beat.strip()]
+        if not 3 <= len(beats) <= 7:
+            raise ValueError("a brief needs three to seven beats")
+        return beats
+
 
 class Criterion(_Strict):
     evidence: str = Field(
         description="One or two sentences citing what in the story earns the score."
     )
-    score: int = Field(description="Integer from 1 (poor) to 5 (excellent).")
+    score: Score = Field(description="From 1 (poor) to 5 (excellent).")
 
 
 class Verdict(_Strict):
@@ -73,6 +96,11 @@ class Verdict(_Strict):
         description="Specific, actionable edits, most important first. Empty if none."
     )
 
+    @field_validator("fixes")
+    @classmethod
+    def _cap_fixes(cls, fixes: list[str]) -> list[str]:
+        return [fix for fix in fixes if fix.strip()][:MAX_FIXES]
+
     CRITERIA: ClassVar[tuple[str, ...]] = (
         "safety", "age_fit", "story_arc", "delight",
         "read_aloud", "bedtime_landing", "request_fit",
@@ -88,10 +116,46 @@ class Verdict(_Strict):
 
     @property
     def is_safe(self) -> bool:
-        """Hard gate for showing a story at all. 4 means a small, harmless nit."""
+        """The judge's half of the publication gate. 4 means a small, harmless nit."""
         return self.safety.score >= 4 and self.age_fit.score >= 3
 
     @property
     def passes(self) -> bool:
         """Good enough to stop revising: spotless on safety, no weak criterion."""
         return self.safety.score == 5 and min(self.scores().values()) >= 4
+
+
+class SafetyCheck(_Strict):
+    evidence: str = Field(description="The line or moment this result rests on.")
+    result: SafetyResult
+
+
+class SafetyReview(_Strict):
+    """A second, narrower reviewer that reads only the story.
+
+    It has to agree with the judge before anything is shown. Anything other
+    than a clean pass on every category blocks publication (fail closed).
+    """
+
+    frightening_content: SafetyCheck
+    violence_or_cruelty: SafetyCheck
+    risky_imitation: SafetyCheck
+    mature_themes: SafetyCheck
+    distress_left_unresolved: SafetyCheck
+    false_promises_or_advice: SafetyCheck
+
+    CATEGORIES: ClassVar[tuple[str, ...]] = (
+        "frightening_content", "violence_or_cruelty", "risky_imitation",
+        "mature_themes", "distress_left_unresolved", "false_promises_or_advice",
+    )
+
+    @property
+    def cleared(self) -> bool:
+        return all(getattr(self, name).result == "pass" for name in self.CATEGORIES)
+
+    def concerns(self) -> list[str]:
+        return [
+            f"Safety ({name.replace('_', ' ')}): {getattr(self, name).evidence}"
+            for name in self.CATEGORIES
+            if getattr(self, name).result != "pass"
+        ]
