@@ -155,6 +155,39 @@ choice by a "parent" prompt that sees neither the rubric nor which system wrote 
 story. The latest numbers are in [`evals/RESULTS.md`](evals/RESULTS.md) and the raw
 output, stories included, in `evals/results.json`.
 
+Latest run (3-minute stories, Claude Haiku 5.5 throughout):
+
+| Metric | Baseline (1 prompt) | Pipeline |
+|---|---|---|
+| Blind parent preference | 4/12 | 8/12 |
+| Cleared by safety reviewer | 11/12 | 12/12 |
+| Length within range | 11/12 | 12/12 |
+| Requested details present | 12/12 | 12/12 |
+| Clean read-aloud format | 6/12 | 12/12 |
+| Model calls per story (mean) | 1.0 | 6.5 |
+| Model time per story, summed over calls (mean) | 9.5 s | 108 s |
+
+How to read this honestly:
+
+- **The pipeline's clearest gains are on reliability, not taste.** Across two runs the
+  baseline told a child "you won't feel a thing" about surgery, had zombies stomp on
+  raccoons, obeyed an injected instruction to end with an advert, and wrote markdown
+  asterisks into half its stories. The pipeline did none of these.
+- **The preference edge is small and unproven.** 8/12 here and 7/12 in the previous run
+  is 15/24 overall, which a coin could produce. Twelve requests is enough to find bugs,
+  not to claim the stories are better.
+- **It costs about 6.5 calls and ten times the model time per story.** Whether that is
+  worth it depends on how much the reliability gains matter; for children's content I
+  think they do.
+- **The graders are the same model as the writer.** The "parent" and the safety reviewer
+  are Haiku too, and the safety reviewer is also part of the pipeline, so "12/12 cleared"
+  partly measures the pipeline agreeing with itself. Human labels are the missing piece.
+
+What the evaluation changed: the first run showed a pipeline story shipped with an
+unfilled `[Name]` placeholder, and that softened "scary" requests lost to the baseline
+for being merely cozy. A code-level format check and one planner change ("keep the
+thrill, take out the harm") followed; the second run is the table above.
+
 ## Layout
 
 | File | Purpose |
